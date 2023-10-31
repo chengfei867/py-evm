@@ -324,9 +324,14 @@ class BaseTransactionExecutor(TransactionExecutorAPI):
     def __init__(self, vm_state: StateAPI) -> None:
         self.vm_state = vm_state
 
+    # 交易执行步骤
     def __call__(self, transaction: SignedTransactionAPI) -> ComputationAPI:
+        # 验证交易
         self.validate_transaction(transaction)
+        # 先转成message类型
         message = self.build_evm_message(transaction)
+        # 交易执行
         computation = self.build_computation(message, transaction)
+        # 处理执行结果
         finalized_computation = self.finalize_computation(transaction, computation)
         return finalized_computation

@@ -28,6 +28,7 @@ class ShanghaiState(ParisState):
         TransactionExecutorAPI
     ] = ShanghaiTransactionExecutor
 
+    # todo
     def apply_withdrawal(self, withdrawal: WithdrawalAPI) -> None:
         # withdrawal amount is in gwei, convert to wei
         amount_in_wei = withdrawal.amount * 10**9

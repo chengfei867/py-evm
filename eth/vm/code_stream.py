@@ -57,11 +57,13 @@ class CodeStream(CodeStreamAPI):
         # a performance-sensitive method
         while True:
             try:
+                # 从虚拟机的原始字节码中获取当前程序计数器（program_counter）指向的字节码指令
                 opcode = self._raw_code_bytes[self.program_counter]
             except IndexError:
                 break
-
+            # 将程序计数器递增，指向下一个指令
             self.program_counter += 1
+            # 返回当前操作码
             yield opcode
             # note: a read might have adjusted the pc during the yield
 

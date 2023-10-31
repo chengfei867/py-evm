@@ -297,17 +297,20 @@ class AccountDB(AccountDatabaseAPI):
         current_nonce = self.get_nonce(address)
         self.set_nonce(address, current_nonce + 1)
 
-    #
-    # Code
-    #
+    # 从状态数据库中获取合约的字节码。
     def get_code(self, address: Address) -> bytes:
+        # 验证了传入的地址 address 是否是一个有效的规范地址
         validate_canonical_address(address, title="Storage Address")
 
+        # 获取指定地址的合约的字节码的哈希值 code_hash
         code_hash = self.get_code_hash(address)
+        # 检查这个哈希值是否等于空哈希 EMPTY_SHA3。
         if code_hash == EMPTY_SHA3:
+            # 如果相等，说明这个地址上没有合约，因此返回一个空的字节串 b""
             return b""
         else:
             try:
+                # 如果 code_hash 不是空哈希，那么它尝试从内部的 _journaldb 中获取字节码
                 return self._journaldb[code_hash]
             except KeyError:
                 raise MissingBytecode(code_hash) from KeyError
@@ -315,14 +318,20 @@ class AccountDB(AccountDatabaseAPI):
                 if code_hash in self._get_accessed_node_hashes():
                     self._accessed_bytecodes.add(address)
 
+    # 在状态数据库中设置合约的字节码
     def set_code(self, address: Address, code: bytes) -> None:
+        # 验证传入的地址 address 是否是有效的规范地址
         validate_canonical_address(address, title="Storage Address")
+        # 以及传入的字节码 code 是否是有效的字节串
         validate_is_bytes(code, title="Code")
-
+        # 获取与这个地址相关联的账户信息
         account = self._get_account(address)
-
+        # 计算传入的字节码 code 的哈希值 code_hash，通常使用 Keccak256 哈希算法来计算
         code_hash = keccak(code)
+        # 将字节码 code 以 code_hash 为键，保存到内部的 _journaldb 中
         self._journaldb[code_hash] = code
+        # 将更新后的账户信息重新存储到状态数据库中。
+        # 这一步是将账户的 code_hash 字段更新为新的 code_hash
         self._set_account(address, account.copy(code_hash=code_hash))
 
     def get_code_hash(self, address: Address) -> Hash32:

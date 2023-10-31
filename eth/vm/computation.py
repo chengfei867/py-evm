@@ -317,7 +317,7 @@ class BaseComputation(ComputationAPI, Configurable):
     def get_log_entries(self) -> Tuple[Tuple[bytes, Tuple[int, ...], bytes], ...]:
         return tuple(log[1:] for log in self.get_raw_log_entries())
 
-    # -- state transition -- #
+    # 状态计算核心函数
     @classmethod
     def apply_computation(
         cls,
@@ -325,30 +325,40 @@ class BaseComputation(ComputationAPI, Configurable):
         message: MessageAPI,
         transaction_context: TransactionContextAPI,
     ) -> ComputationAPI:
+        # 这个语句创建了一个 computation 对象
+        # 上下文管理器 with 会在执行完代码块后自动关闭 computation 对象
         with cls(state, message, transaction_context) as computation:
+            # 检查当前的交易是否是合约创建交易，并且 computation 对象是否属于原始的合约创建。
+            # 如果是，说明需要消耗 initcode gas cost。
+            # 在以太坊中，initcode 是合约初始化代码，需要消耗一定的 gas
             if message.is_create and computation.is_origin_computation:
-                # If computation is from a create transaction, consume initcode gas if
-                # >= Shanghai. CREATE and CREATE2 are handled in the opcode
-                # implementations.
                 cls.consume_initcode_gas_cost(computation)
 
-            # Early exit on pre-compiles
+            # 尝试从 computation 对象的 precompiles 属性中获取与 message 的 code_address 相关的预编译合约
+            # 预编译合约是一类特殊的合约，它们的执行逻辑是提前定义好的。
+            # 如果找到了匹配的预编译合约，就执行这个合约的逻辑。
             precompile = computation.precompiles.get(message.code_address, NO_RESULT)
+
             if precompile is not NO_RESULT:
                 precompile(computation)
                 return computation
 
+            # 这行代码检查是否需要输出调试信息，以便根据日志进行调试
             show_debug2 = computation.logger.show_debug2
 
+            # 获取与当前交易相关的操作码（opcode）查找表，用于根据指令执行相应的操作
             opcode_lookup = computation.opcodes
+            # 遍历交易中的每个操作码
             for opcode in computation.code:
                 try:
+                    # 查找当前操作码对应的处理函数（opcode_fn）
                     opcode_fn = opcode_lookup[opcode]
                 except KeyError:
+                    # 如果找不到，将会引发 KeyError 异常，表示操作码无效
                     opcode_fn = InvalidOpcode(opcode)
 
                 if show_debug2:
-                    # We dig into some internals for debug logs
+                    # 如果启用了调试信息输出，将输出当前操作码的信息，包括 opcode 的十六进制表示、助记符、程序计数器等
                     base_comp = cast(BaseComputation, computation)
                     computation.logger.debug2(
                         "OPCODE: 0x%x (%s) | pc: %s | stack: %s",
@@ -359,10 +369,13 @@ class BaseComputation(ComputationAPI, Configurable):
                     )
 
                 try:
+                    # 尝试执行当前操作码的处理函数，如果执行过程中发生了 Halt 异常，表示操作码执行结束，循环结束。
+                    # 这是因为 EVM 中的一些操作码（如 RETURN）可能导致早期退出，不再执行后续的操作码。
                     opcode_fn(computation=computation)
                 except Halt:
                     break
-
+        # 返回执行完毕后的 computation 对象，其中包含了交易执行的结果和状态。
+        # 这个对象将被用于后续的交易结算和状态更新。
         return computation
 
     # -- error handling -- #

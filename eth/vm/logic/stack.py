@@ -8,17 +8,22 @@ def pop(computation: ComputationAPI) -> None:
 
 
 def push_XX(computation: ComputationAPI, size: int) -> None:
+    # 从当前执行上下文的 computation 中的 code 属性中读取指定大小（size）的字节数据
     raw_value = computation.code.read(size)
 
     # This is a performance-sensitive area.
     # Calling raw_value.ljust() when size == len(raw_value) is more expensive than
     # calling len(raw_value) and raw_len is typically the correct size already,
     # so this saves a bit of time:
+    # 计算 raw_value 的实际字节大小，通常等于 size，但如果数据不足 size，则会小于 size
     raw_len = len(raw_value)
     if raw_len == size:
+        # 如果相等，表示读取的数据已经足够，无需填充
         computation.stack_push_bytes(raw_value)
     else:
+        # 读取的数据不足 size，需要填充
         padded_value = raw_value.ljust(size, b"\x00")
+        # 将填充后的 padded_value 推送到执行上下文的栈中
         computation.stack_push_bytes(padded_value)
 
 

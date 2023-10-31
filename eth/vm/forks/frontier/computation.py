@@ -52,6 +52,9 @@ class FrontierComputation(BaseComputation):
     opcodes = FRONTIER_OPCODES
     _precompiles = FRONTIER_PRECOMPILES  # type: ignore # https://github.com/python/mypy/issues/708 # noqa: E501
 
+    # 处理消息的执行，包括转账操作和合约内部调用，确保执行消息操作时，余额、堆栈深度等都满足要求。
+    # 在出现错误时，会回滚状态，以保持状态的一致性。
+    # 这个方法是以太坊虚拟机中消息处理的核心部分。
     @classmethod
     def apply_message(
         cls,
@@ -59,20 +62,27 @@ class FrontierComputation(BaseComputation):
         message: MessageAPI,
         transaction_context: TransactionContextAPI,
     ) -> ComputationAPI:
+        # 创建了当前状态的快照
         snapshot = state.snapshot()
 
+        # 检查消息的堆栈深度是否超出了堆栈深度限制。如果是，会引发 StackDepthLimit 异常。
         if message.depth > STACK_DEPTH_LIMIT:
             raise StackDepthLimit("Stack depth limit reached")
 
+        # 如果消息有转账操作（普通转账、创建、调用合约花费余额）
         if message.should_transfer_value and message.value:
+            # 获取消息发送者的余额
             sender_balance = state.get_balance(message.sender)
 
+            # 如果消息发送者的余额小于消息中指定的价值，引发 InsufficientFunds 异常，表示余额不足以支付价值
             if sender_balance < message.value:
                 raise InsufficientFunds(
                     f"Insufficient funds: {sender_balance} < {message.value}"
                 )
 
+            # 减少消息发送者的余额，扣除转账的价值
             state.delta_balance(message.sender, -1 * message.value)
+            # 增加消息中指定的接收地址的余额，增加转账的价值
             state.delta_balance(message.storage_address, message.value)
 
             cls.logger.debug2(
@@ -81,9 +91,9 @@ class FrontierComputation(BaseComputation):
                 encode_hex(message.sender),
                 encode_hex(message.storage_address),
             )
-
+        # 标记接收地址对应的账户在本次交易中已经被访问过
         state.touch_account(message.storage_address)
-
+        # 调用 apply_computation 方法，执行消息的计算，并返回 Computation 对象
         computation = cls.apply_computation(
             state,
             message,

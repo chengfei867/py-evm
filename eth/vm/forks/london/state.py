@@ -43,6 +43,7 @@ from .validation import (
 
 
 class LondonTransactionExecutor(BerlinTransactionExecutor):
+    # 负责构建 EVM（以太虚拟机）消息（Message）对象，该消息将用于执行交易
     def build_evm_message(self, transaction: SignedTransactionAPI) -> MessageAPI:
         # Use vm_state.get_gas_price instead of transaction_context.gas_price so
         #   that we can run get_transaction_result (aka~ eth_call) and estimate_gas.
@@ -51,17 +52,19 @@ class LondonTransactionExecutor(BerlinTransactionExecutor):
         #   get_gas_price() will return 0 for eth_call, but
         #   transaction_context.gas_price will return the same value as the
         #   GASPRICE opcode.
+        # 计算gas_fee
         gas_fee = transaction.gas * self.vm_state.get_gas_price(transaction)
 
-        # Buy Gas
+        # 扣除发送者的余额，减去购买 gas 所需的 gas_fee
         self.vm_state.delta_balance(transaction.sender, -1 * gas_fee)
 
-        # Increment Nonce
+        # 增加发送者账户的 nonce。Nonce 是一个整数，用于确保交易按正确的顺序执行
         self.vm_state.increment_nonce(transaction.sender)
 
-        # Setup VM Message
+        # 表示 EVM 消息中可用的 gas 数量，等于交易的 gas 限制减去交易的内在 gas 消耗
         message_gas = transaction.gas - transaction.intrinsic_gas
 
+        # 如果交易目标地址是合约类型的地址，则创建合约地址
         if transaction.to == CREATE_CONTRACT_ADDRESS:
             contract_address = generate_contract_address(
                 transaction.sender,
@@ -70,8 +73,10 @@ class LondonTransactionExecutor(BerlinTransactionExecutor):
             data = b""
             code = transaction.data
         else:
+            # 否则是一个普通的交易或合约调用交易
             contract_address = None
             data = transaction.data
+            # 根据目的地址获取合约字节码
             code = self.vm_state.get_code(transaction.to)
 
         self.vm_state.logger.debug2(
@@ -82,6 +87,7 @@ class LondonTransactionExecutor(BerlinTransactionExecutor):
             encode_hex(keccak(transaction.data)),
         )
 
+        # 构建message对象
         message = Message(
             gas=message_gas,
             to=transaction.to,
