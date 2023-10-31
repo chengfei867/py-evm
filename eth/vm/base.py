@@ -260,7 +260,7 @@ class VM(Configurable, VirtualMachineAPI):
                 base_fee_per_gas=base_fee,  # 基础气体费用
             )
 
-    # 负责执行合约字节码（bytecode）。
+    # 执行合约字节码（bytecode）,这个方法一般用于测试，看完交易执行流程后再回头看这个方法就明白了。
     def execute_bytecode(
             # 这些参数描述了要执行的合约字节码的相关信息，例如发送者、接收者、燃气限制、输入数据等。
             self,
@@ -300,7 +300,6 @@ class VM(Configurable, VirtualMachineAPI):
 
         # 最后，调用 self.state.computation_class.apply_computation 方法，执行合约字节码。
         # 执行结果将作为 ComputationAPI 对象返回，其中包含了合约执行的详细信息，包括执行状态、燃气消耗、错误信息、日志等。
-        # todo
         return self.state.computation_class.apply_computation(
             self.state,
             message,
