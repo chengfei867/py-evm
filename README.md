@@ -8,7 +8,7 @@
 
 
 ## Py-EVM
-核心逻辑加入了中文注释
+### 核心逻辑加入了中文注释
 Py-EVM is an implementation of the Ethereum protocol in Python. It contains the low level
 primitives for the existing Ethereum 1.0 chain as well as emerging support for the upcoming
 Ethereum 2.0 / Serenity spec.
